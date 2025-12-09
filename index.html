@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ลงทะเบียนสมาชิก</title>
-    <!-- นำเข้า LIFF SDK -->
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
         body {
@@ -25,10 +24,9 @@
             width: 80%;
             max-width: 400px;
         }
-        /* Loading Animation CSS */
         .loader {
             border: 5px solid #f3f3f3;
-            border-top: 5px solid #06c755; /* สีเขียว LINE */
+            border-top: 5px solid #06c755;
             border-radius: 50%;
             width: 50px;
             height: 50px;
@@ -39,14 +37,9 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .hidden {
-            display: none;
-        }
-        .success-icon {
-            color: #06c755;
-            font-size: 50px;
-            margin-bottom: 10px;
-        }
+        .hidden { display: none; }
+        .success-icon { color: #06c755; font-size: 50px; margin-bottom: 10px; }
+        .warning-icon { color: #ff9800; font-size: 50px; margin-bottom: 10px; }
         h2 { margin-top: 0; color: #333; }
         p { color: #666; }
         button {
@@ -59,26 +52,35 @@
             font-size: 16px;
             margin-top: 15px;
         }
+        button.close-btn { background-color: #333; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <!-- ส่วนแสดงผลขณะโหลด -->
+        <!-- 1. หน้าโหลด -->
         <div id="loadingBlock">
             <div class="loader"></div>
             <p>โปรดรอสักครู่...<br>กำลังตรวจสอบและลงทะเบียน</p>
         </div>
 
-        <!-- ส่วนแสดงผลเมื่อสำเร็จ -->
+        <!-- 2. หน้าสำเร็จ -->
         <div id="successBlock" class="hidden">
             <div class="success-icon">✓</div>
             <h2>ลงทะเบียนเรียบร้อย</h2>
             <p>ระบบได้บันทึกข้อมูลของคุณแล้ว</p>
-            <button onclick="liff.closeWindow()">ปิดหน้าต่าง</button>
+            <button class="close-btn" onclick="closeLiffWindow()">ปิดหน้าต่าง</button>
         </div>
 
-        <!-- ส่วนแสดงผลเมื่อ Error -->
+        <!-- 3. หน้าซ้ำ (เคยลงทะเบียนแล้ว) -->
+        <div id="duplicateBlock" class="hidden">
+            <div class="warning-icon">!</div>
+            <h2>คุณเคยลงทะเบียนแล้ว</h2>
+            <p>ไม่จำเป็นต้องลงทะเบียนซ้ำ</p>
+            <button class="close-btn" onclick="closeLiffWindow()">ปิดหน้าต่าง</button>
+        </div>
+
+        <!-- 4. หน้า Error -->
         <div id="errorBlock" class="hidden">
             <h2 style="color:red;">เกิดข้อผิดพลาด</h2>
             <p id="errorMessage"></p>
@@ -87,27 +89,20 @@
     </div>
 
     <script>
-        // --- ส่วนที่แก้ไขค่า config แล้ว ---
         const LIFF_ID = '2008647384-maqXWxQW'; 
         const GAS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwkuYnGm-0zAEJILCB0FbyqJeiRZ-UakmoPuVgz5sEzOT0BPKwHhjY8qcng9ppfG5nM/exec';
-        // ----------------------
 
         async function main() {
             try {
                 await liff.init({ liffId: LIFF_ID });
 
-                // ถ้ายังไม่ login ให้สั่ง login
                 if (!liff.isLoggedIn()) {
                     liff.login();
                     return;
                 }
 
-                // ดึงข้อมูล Profile
                 const profile = await liff.getProfile();
                 
-                // --- ยกเลิกการเก็บ Email ตามคำขอ ---
-
-                // เตรียมข้อมูลที่จะส่ง (ตัด Email ออก)
                 const payload = {
                     userId: profile.userId,
                     displayName: profile.displayName,
@@ -115,7 +110,6 @@
                     statusMessage: profile.statusMessage || "-"
                 };
 
-                // ส่งข้อมูลไปที่ Google Apps Script
                 await sendDataToGAS(payload);
 
             } catch (err) {
@@ -124,36 +118,63 @@
         }
 
         function sendDataToGAS(data) {
-            // ใช้ fetch ส่งข้อมูลแบบ POST
+            // เอา mode: 'no-cors' ออก เพื่อให้อ่าน response ได้
+            // GAS Web App ต้องตั้งค่า Deploy เป็น "Anyone" ถึงจะรับ fetch แบบนี้ได้
             fetch(GAS_SCRIPT_URL, {
                 method: 'POST',
-                mode: 'no-cors', // สำคัญ: no-cors เพื่อเลี่ยงปัญหา CORS
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // ใช้ text/plain เพื่อเลี่ยง Preflight CORS บางกรณี
                 body: JSON.stringify(data)
             })
-            .then(() => {
-                // เนื่องจากใช้ no-cors เราจะสมมติว่าส่งสำเร็จเสมอถ้าไม่ network error
-                showSuccess();
+            .then(response => response.json())
+            .then(responseData => {
+                if (responseData.result === 'duplicate') {
+                    showDuplicate();
+                } else if (responseData.result === 'success') {
+                    showSuccess();
+                } else {
+                    showError("เกิดข้อผิดพลาด: " + (responseData.error || "Unknown Error"));
+                }
             })
             .catch(error => {
-                showError("ส่งข้อมูลไม่สำเร็จ: " + error);
+                showError("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้: " + error);
             });
         }
 
         function showSuccess() {
-            document.getElementById('loadingBlock').classList.add('hidden');
+            hideAll();
             document.getElementById('successBlock').classList.remove('hidden');
         }
 
+        function showDuplicate() {
+            hideAll();
+            document.getElementById('duplicateBlock').classList.remove('hidden');
+        }
+
         function showError(msg) {
-            document.getElementById('loadingBlock').classList.add('hidden');
+            hideAll();
             document.getElementById('errorBlock').classList.remove('hidden');
             document.getElementById('errorMessage').innerText = msg;
         }
 
-        // เริ่มทำงาน
+        function hideAll() {
+            document.getElementById('loadingBlock').classList.add('hidden');
+            document.getElementById('successBlock').classList.add('hidden');
+            document.getElementById('duplicateBlock').classList.add('hidden');
+            document.getElementById('errorBlock').classList.add('hidden');
+        }
+
+        // ฟังก์ชันปิดหน้าต่างที่รัดกุมขึ้น
+        function closeLiffWindow() {
+            if (liff.isInClient()) {
+                liff.closeWindow();
+            } else {
+                // กรณีเปิดใน Browser ปกติ (ปิดไม่ได้ด้วย script)
+                alert("กรุณากดปิดหน้าต่างเบราว์เซอร์ด้วยตนเอง");
+                // ลองพยายามปิดดู (อาจไม่ได้ผลในบาง browser)
+                window.close();
+            }
+        }
+
         main();
     </script>
 </body>
