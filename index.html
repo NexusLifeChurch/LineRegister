@@ -87,9 +87,9 @@
     </div>
 
     <script>
-        // --- ส่วนที่ต้องแก้ไข ---
-        const LIFF_ID = 'REPLACE_WITH_YOUR_LIFF_ID'; // ใส่ LIFF ID ที่ได้จาก LINE Developers
-        const GAS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwkuYnGm-0zAEJILCB0FbyqJeiRZ-UakmoPuVgz5sEzOT0BPKwHhjY8qcng9ppfG5nM/exec'; // ใส่ URL ของ Web App จาก Google Apps Script
+        // --- ส่วนที่แก้ไขค่า config แล้ว ---
+        const LIFF_ID = '2008647384-maqXWxQW'; 
+        const GAS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwkuYnGm-0zAEJILCB0FbyqJeiRZ-UakmoPuVgz5sEzOT0BPKwHhjY8qcng9ppfG5nM/exec';
         // ----------------------
 
         async function main() {
@@ -105,17 +105,14 @@
                 // ดึงข้อมูล Profile
                 const profile = await liff.getProfile();
                 
-                // ดึงข้อมูล Email (ต้องขอ Permission 'email' ใน Console ก่อน)
-                const user = liff.getDecodedIDToken();
-                const email = user && user.email ? user.email : "ไม่ได้รับอนุญาต";
+                // --- ยกเลิกการเก็บ Email ตามคำขอ ---
 
-                // เตรียมข้อมูลที่จะส่ง
+                // เตรียมข้อมูลที่จะส่ง (ตัด Email ออก)
                 const payload = {
                     userId: profile.userId,
                     displayName: profile.displayName,
                     pictureUrl: profile.pictureUrl,
-                    statusMessage: profile.statusMessage || "-",
-                    email: email
+                    statusMessage: profile.statusMessage || "-"
                 };
 
                 // ส่งข้อมูลไปที่ Google Apps Script
@@ -130,7 +127,7 @@
             // ใช้ fetch ส่งข้อมูลแบบ POST
             fetch(GAS_SCRIPT_URL, {
                 method: 'POST',
-                mode: 'no-cors', // สำคัญ: no-cors เพื่อเลี่ยงปัญหา CORS เบื้องต้น (เราจะไม่ได้รับ response body กลับมาอ่าน แต่ส่งไปถึงแน่นอน)
+                mode: 'no-cors', // สำคัญ: no-cors เพื่อเลี่ยงปัญหา CORS
                 headers: {
                     'Content-Type': 'application/json'
                 },
