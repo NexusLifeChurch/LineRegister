@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ลงทะเบียนสมาชิก</title>
+    <title>ลงทะเบียนสมาชิก (v2)</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
         body {
@@ -89,6 +89,7 @@
     </div>
 
     <script>
+        // Config ค่าเดิมของคุณ
         const LIFF_ID = '2008647384-maqXWxQW'; 
         const GAS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwkuYnGm-0zAEJILCB0FbyqJeiRZ-UakmoPuVgz5sEzOT0BPKwHhjY8qcng9ppfG5nM/exec';
 
@@ -110,6 +111,7 @@
                     statusMessage: profile.statusMessage || "-"
                 };
 
+                // ส่งข้อมูลและรอผลลัพธ์
                 await sendDataToGAS(payload);
 
             } catch (err) {
@@ -118,21 +120,25 @@
         }
 
         function sendDataToGAS(data) {
-            // เอา mode: 'no-cors' ออก เพื่อให้อ่าน response ได้
-            // GAS Web App ต้องตั้งค่า Deploy เป็น "Anyone" ถึงจะรับ fetch แบบนี้ได้
+            // ใช้ fetch ส่งข้อมูลแบบ POST
+            // headers: text/plain เพื่อให้ GAS รับได้โดยไม่ติด Preflight CORS
             fetch(GAS_SCRIPT_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // ใช้ text/plain เพื่อเลี่ยง Preflight CORS บางกรณี
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
                 body: JSON.stringify(data)
             })
-            .then(response => response.json())
+            .then(response => response.json()) // แปลงผลลัพธ์เป็น JSON
             .then(responseData => {
+                console.log("Server Response:", responseData); // ดูค่าใน Console ได้ถ้าต้องการ debug
+
+                // ตรวจสอบค่า result ที่ส่งกลับมา
                 if (responseData.result === 'duplicate') {
                     showDuplicate();
                 } else if (responseData.result === 'success') {
                     showSuccess();
                 } else {
-                    showError("เกิดข้อผิดพลาด: " + (responseData.error || "Unknown Error"));
+                    // กรณีส่งกลับมาแต่ไม่ใช่ success หรือ duplicate
+                    showError("เกิดข้อผิดพลาด: " + (responseData.error || JSON.stringify(responseData)));
                 }
             })
             .catch(error => {
@@ -163,14 +169,11 @@
             document.getElementById('errorBlock').classList.add('hidden');
         }
 
-        // ฟังก์ชันปิดหน้าต่างที่รัดกุมขึ้น
         function closeLiffWindow() {
             if (liff.isInClient()) {
                 liff.closeWindow();
             } else {
-                // กรณีเปิดใน Browser ปกติ (ปิดไม่ได้ด้วย script)
                 alert("กรุณากดปิดหน้าต่างเบราว์เซอร์ด้วยตนเอง");
-                // ลองพยายามปิดดู (อาจไม่ได้ผลในบาง browser)
                 window.close();
             }
         }
