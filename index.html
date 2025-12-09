@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ลงทะเบียนสมาชิก</title>
+    <!-- นำเข้า LIFF SDK -->
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f2f5;
+            text-align: center;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 80%;
+            max-width: 400px;
+        }
+        /* Loading Animation CSS */
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #06c755; /* สีเขียว LINE */
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .hidden {
+            display: none;
+        }
+        .success-icon {
+            color: #06c755;
+            font-size: 50px;
+            margin-bottom: 10px;
+        }
+        h2 { margin-top: 0; color: #333; }
+        p { color: #666; }
+        button {
+            background-color: #06c755;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- ส่วนแสดงผลขณะโหลด -->
+        <div id="loadingBlock">
+            <div class="loader"></div>
+            <p>โปรดรอสักครู่...<br>กำลังตรวจสอบและลงทะเบียน</p>
+        </div>
+
+        <!-- ส่วนแสดงผลเมื่อสำเร็จ -->
+        <div id="successBlock" class="hidden">
+            <div class="success-icon">✓</div>
+            <h2>ลงทะเบียนเรียบร้อย</h2>
+            <p>ระบบได้บันทึกข้อมูลของคุณแล้ว</p>
+            <button onclick="liff.closeWindow()">ปิดหน้าต่าง</button>
+        </div>
+
+        <!-- ส่วนแสดงผลเมื่อ Error -->
+        <div id="errorBlock" class="hidden">
+            <h2 style="color:red;">เกิดข้อผิดพลาด</h2>
+            <p id="errorMessage"></p>
+            <button onclick="window.location.reload()">ลองใหม่อีกครั้ง</button>
+        </div>
+    </div>
+
+    <script>
+        // --- ส่วนที่ต้องแก้ไข ---
+        const LIFF_ID = 'REPLACE_WITH_YOUR_LIFF_ID'; // ใส่ LIFF ID ที่ได้จาก LINE Developers
+        const GAS_SCRIPT_URL = 'REPLACE_WITH_YOUR_EXEC_URL'; // ใส่ URL ของ Web App จาก Google Apps Script
+        // ----------------------
+
+        async function main() {
+            try {
+                await liff.init({ liffId: LIFF_ID });
+
+                // ถ้ายังไม่ login ให้สั่ง login
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return;
+                }
+
+                // ดึงข้อมูล Profile
+                const profile = await liff.getProfile();
+                
+                // ดึงข้อมูล Email (ต้องขอ Permission 'email' ใน Console ก่อน)
+                const user = liff.getDecodedIDToken();
+                const email = user && user.email ? user.email : "ไม่ได้รับอนุญาต";
+
+                // เตรียมข้อมูลที่จะส่ง
+                const payload = {
+                    userId: profile.userId,
+                    displayName: profile.displayName,
+                    pictureUrl: profile.pictureUrl,
+                    statusMessage: profile.statusMessage || "-",
+                    email: email
+                };
+
+                // ส่งข้อมูลไปที่ Google Apps Script
+                await sendDataToGAS(payload);
+
+            } catch (err) {
+                showError("Error: " + err.message);
+            }
+        }
+
+        function sendDataToGAS(data) {
+            // ใช้ fetch ส่งข้อมูลแบบ POST
+            fetch(GAS_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors', // สำคัญ: no-cors เพื่อเลี่ยงปัญหา CORS เบื้องต้น (เราจะไม่ได้รับ response body กลับมาอ่าน แต่ส่งไปถึงแน่นอน)
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(() => {
+                // เนื่องจากใช้ no-cors เราจะสมมติว่าส่งสำเร็จเสมอถ้าไม่ network error
+                showSuccess();
+            })
+            .catch(error => {
+                showError("ส่งข้อมูลไม่สำเร็จ: " + error);
+            });
+        }
+
+        function showSuccess() {
+            document.getElementById('loadingBlock').classList.add('hidden');
+            document.getElementById('successBlock').classList.remove('hidden');
+        }
+
+        function showError(msg) {
+            document.getElementById('loadingBlock').classList.add('hidden');
+            document.getElementById('errorBlock').classList.remove('hidden');
+            document.getElementById('errorMessage').innerText = msg;
+        }
+
+        // เริ่มทำงาน
+        main();
+    </script>
+</body>
+</html>
